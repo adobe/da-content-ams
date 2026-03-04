@@ -15,8 +15,6 @@ import getObject from './storage/object.js';
 import { get404, daResp, getRobots } from './responses/index.js';
 import getFromAdmin from './storage/admin.js';
 
-// https://www.aem.live/docs/security#backends-with-ip-filtering
-const HELIX_ADMIN_IP = '3.227.118.73';
 const EMBEDDABLE_ASSETS_EXTENSIONS = ['.avif', '.jpg', '.jpeg', '.png', '.svg', '.gif', '.mp4'];
 
 async function getFromStorage(pathname, env) {
@@ -28,10 +26,11 @@ async function getFromStorage(pathname, env) {
 function isEmbeddableAsset(pathname) {
   return EMBEDDABLE_ASSETS_EXTENSIONS.some((ext) => pathname.endsWith(ext));
 }
-
+// https://www.aem.live/docs/security#backends-with-ip-filtering
 function isAllowListed(env, req, org) {
+  const allowedIps = env.HELIX_ADMIN_IPS?.split(',').map((ip) => ip.trim()) || [];
   return env.ADMIN_EXCEPTED_ORGS?.split(',').includes(org)
-    && req.headers.get('cf-connecting-ip') === HELIX_ADMIN_IP;
+    && allowedIps.includes(req.headers.get('cf-connecting-ip'));
 }
 
 export default {

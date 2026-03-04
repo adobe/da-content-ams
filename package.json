@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy:prod": "wrangler deploy",
-    "deploy:stage": "wrangler deploy --env stage",
+    "deploy:prod": "wrangler deploy --env gov-prod",
+    "deploy:stage": "wrangler deploy --env gov-stage",
     "dev": "wrangler dev",
     "lint": "eslint ."
   },

@@ -1,9 +1,8 @@
 name = "da-content-ams"
-account_id = "980b8b7745c7f2165f369b9d6f3c61f5"
 main = "src/index.js"
-compatibility_date = "2023-11-21"
+compatibility_date = "2026-03-04"
 
-keep_vars = true
+# Note: account_id and keep_vars are set per environment below
 
 # [secrets]
 # Secrets must be set via: wrangler secret put SECRET_NAME --env ENVIRONMENT
@@ -18,6 +17,8 @@ port = 8788
 # === GOV STAGE ENVIRONMENT ===
 ########################################################
 [env.gov-stage]
+account_id = "980b8b7745c7f2165f369b9d6f3c61f5" # GovCloud Stage account
+keep_vars = true
 routes = ["stg-content.ssa-da.live/*"]
 
 services = [
@@ -29,13 +30,21 @@ ENVIRONMENT = "gov-stage"
 AEM_BUCKET_NAME = "aem-content-stage"
 AMDMIN_URL = "stg-admin.ssa-da.live"
 ADMIN_EXCEPTED_ORGS = "adobe,ams-eds"
-S3_DEF_URL = "https://980b8b7745c7f2165f369b9d6f3c61f5.r2.cloudflarestorage.com"
+CF_ACCOUNT_ID = "980b8b7745c7f2165f369b9d6f3c61f5"
+
+# Helix Admin IP whitelist (comma-separated) - https://www.aem.live/docs/security#backends-with-ip-filtering
+# '3.227.118.73', // Adobe commercial AWS (us-east-1)
+# '56.137.172.84', // Adobe GovCloud Stage - gov-aem (us-gov-west-1)
+HELIX_ADMIN_IPS = "56.137.172.84"
+
 # S3_ACCESS_KEY_ID = "set via wrangler secret put"
 # S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
 
 # === GOV PROD ENVIRONMENT ===
 ########################################################
 [env.gov-prod]
+account_id = "980b8b7745c7f2165f369b9d6f3c61f5" # GovCloud Prod account - UPDATE WHEN AVAILABLE
+keep_vars = true
 routes = ["content.ssa-aem.live/*"]
 
 services = [
@@ -47,6 +56,11 @@ ENVIRONMENT = "gov-prod"
 AEM_BUCKET_NAME = "aem-content-prod"
 AMDMIN_URL = "admin.ssa-da.live"
 ADMIN_EXCEPTED_ORGS = "ams-eds"
-S3_DEF_URL = "https://980b8b7745c7f2165f369b9d6f3c61f5.r2.cloudflarestorage.com"
+CF_ACCOUNT_ID = "REPLACE_WITH_GOV_PROD_ACCOUNT_ID"
+
+# Helix Admin IP whitelist (comma-separated) - https://www.aem.live/docs/security#backends-with-ip-filtering
+# TBD_PROD_IP: Adobe GovCloud Prod - UPDATE WHEN AVAILABLE
+HELIX_ADMIN_IPS = "TBD_PROD_IP"
+
 # S3_ACCESS_KEY_ID = "set via wrangler secret put"
 # S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
