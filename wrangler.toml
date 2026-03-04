@@ -1,21 +1,52 @@
-name = "da-content"
+name = "da-content-ams"
+account_id = "980b8b7745c7f2165f369b9d6f3c61f5"
 main = "src/index.js"
 compatibility_date = "2023-11-21"
 
 keep_vars = true
 
-vars = { AEM_BUCKET_NAME = "aem-content" }
-
-services = [
-  { binding = "daadmin", service = "da-admin" }
-]
-
-[env.stage]
-vars = { ENVIRONMENT = "stage", AEM_BUCKET_NAME = "aem-content-stage" }
-
-services = [
-  { binding = "daadmin", service = "da-admin-stage" }
-]
+# [secrets]
+# Secrets must be set via: wrangler secret put SECRET_NAME --env ENVIRONMENT
+# Required secrets per environment:
+# - S3_ACCESS_KEY_ID (if accessing R2 directly)
+# - S3_SECRET_ACCESS_KEY (if accessing R2 directly)
+# Note: da-content-ams primarily accesses content via service binding to da-admin
 
 [dev]
 port = 8788
+
+# === GOV STAGE ENVIRONMENT ===
+########################################################
+[env.gov-stage]
+routes = ["stg-content.ssa-da.live/*"]
+
+services = [
+  { binding = "daadmin", service = "da-admin-ams-gov-stage" }
+]
+
+[env.gov-stage.vars]
+ENVIRONMENT = "gov-stage"
+AEM_BUCKET_NAME = "aem-content-stage"
+AMDMIN_URL = "stg-admin.ssa-da.live"
+ADMIN_EXCEPTED_ORGS = "adobe,ams-eds"
+S3_DEF_URL = "https://980b8b7745c7f2165f369b9d6f3c61f5.r2.cloudflarestorage.com"
+# S3_ACCESS_KEY_ID = "set via wrangler secret put"
+# S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
+
+# === GOV PROD ENVIRONMENT ===
+########################################################
+[env.gov-prod]
+routes = ["content.ssa-aem.live/*"]
+
+services = [
+  { binding = "daadmin", service = "da-admin-ams-gov-prod" }
+]
+
+[env.gov-prod.vars]
+ENVIRONMENT = "gov-prod"
+AEM_BUCKET_NAME = "aem-content-prod"
+AMDMIN_URL = "admin.ssa-da.live"
+ADMIN_EXCEPTED_ORGS = "ams-eds"
+S3_DEF_URL = "https://980b8b7745c7f2165f369b9d6f3c61f5.r2.cloudflarestorage.com"
+# S3_ACCESS_KEY_ID = "set via wrangler secret put"
+# S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
