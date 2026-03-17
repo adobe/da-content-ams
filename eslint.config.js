@@ -24,6 +24,7 @@ export default defineConfig([
     'coverage',
     'node_modules/*',
     '.wrangler/*',
+    'vitest.config.js',
   ]),
   {
     extends: [recommended],

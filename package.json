@@ -7,10 +7,12 @@
     "deploy:prod": "wrangler deploy --env gov-prod",
     "deploy:stage": "wrangler deploy --env gov-stage",
     "dev": "wrangler dev",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run --coverage"
   },
   "devDependencies": {
     "@adobe/eslint-config-helix": "3.0.9",
+    "@vitest/coverage-v8": "^3.2.4",
     "eslint": "9.4.0",
     "vitest": "3.2.4",
     "wrangler": "4.33.1"
