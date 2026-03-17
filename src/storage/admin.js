@@ -13,7 +13,7 @@ import { parse } from 'cookie';
 import { daResp } from '../responses/index.js';
 
 // Admin URL configuration
-const getAdminUrl = (env) => `https://${env.AMDMIN_URL || 'admin.da.live'}`;
+const getAdminUrl = (env) => `https://${env.ADMIN_URL || 'admin.da.live'}`;
 
 function getAuthCookie(req) {
   if (!req.headers.has('cookie')) return null;

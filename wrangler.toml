@@ -19,7 +19,9 @@ port = 8788
 [env.gov-stage]
 account_id = "980b8b7745c7f2165f369b9d6f3c61f5" # GovCloud Stage account
 keep_vars = true
-routes = ["stg-content.ssa-da.live/*"]
+routes = [
+  { pattern = "content-stg.ssa-da.live/*", zone_name = "ssa-da.live" }
+]
 
 services = [
   { binding = "daadmin", service = "da-admin-ams-gov-stage" }
@@ -28,7 +30,7 @@ services = [
 [env.gov-stage.vars]
 ENVIRONMENT = "gov-stage"
 AEM_BUCKET_NAME = "aem-content-stage"
-AMDMIN_URL = "stg-admin.ssa-da.live"
+ADMIN_URL = "stg-admin.ssa-da.live"
 ADMIN_EXCEPTED_ORGS = "adobe,ams-eds"
 CF_ACCOUNT_ID = "980b8b7745c7f2165f369b9d6f3c61f5"
 
@@ -54,7 +56,7 @@ services = [
 [env.gov-prod.vars]
 ENVIRONMENT = "gov-prod"
 AEM_BUCKET_NAME = "aem-content-prod"
-AMDMIN_URL = "admin.ssa-da.live"
+ADMIN_URL = "admin.ssa-da.live"
 ADMIN_EXCEPTED_ORGS = "ams-eds"
 CF_ACCOUNT_ID = "REPLACE_WITH_GOV_PROD_ACCOUNT_ID"
 
