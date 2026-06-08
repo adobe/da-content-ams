@@ -66,3 +66,30 @@ HELIX_ADMIN_IPS = "TBD_PROD_IP"
 
 # S3_ACCESS_KEY_ID = "set via wrangler secret put"
 # S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
+
+# === ENT-AEM ENVIRONMENT ===
+########################################################
+[env.ent-aem]
+account_id = "ff68e0f71563bc546fedcfda6bd8e5ca"
+keep_vars = true
+routes = [
+  { pattern = "content.ent-da.live/*", zone_name = "ent-da.live" }
+]
+
+services = [
+  { binding = "daadmin", service = "da-admin-ams-ent-aem" }
+]
+
+[env.ent-aem.vars]
+ENVIRONMENT = "ent-aem"
+AEM_BUCKET_NAME = "aem-content-ent"
+ADMIN_URL = "admin.ent-da.live"
+ADMIN_EXCEPTED_ORGS = "adobe,ams-eds,ssa-eds"
+CF_ACCOUNT_ID = "ff68e0f71563bc546fedcfda6bd8e5ca"
+
+# Helix Admin IP whitelist (comma-separated) - https://www.aem.live/docs/security#backends-with-ip-filtering
+# 34.208.108.255, 52.26.227.164 // NAT Gateway IPs for ent-aem Lambda functions (us-west-2)
+HELIX_ADMIN_IPS = "34.208.108.255, 52.26.227.164"
+
+# S3_ACCESS_KEY_ID = "set via wrangler secret put"
+# S3_SECRET_ACCESS_KEY = "set via wrangler secret put"

@@ -1,11 +1,12 @@
 {
-  "name": "da-content",
+  "name": "da-content-ams",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "deploy:prod": "wrangler deploy --env gov-prod",
     "deploy:stage": "wrangler deploy --env gov-stage",
+    "deploy:ent-aem": "wrangler deploy --env ent-aem",
     "dev": "wrangler dev",
     "lint": "eslint .",
     "test": "vitest run --coverage"
