@@ -11,11 +11,14 @@
  */
 import { getDaCtx } from './utils/daCtx.js';
 import getObject from './storage/object.js';
+import { getCookie } from './cookie.js';
 
 import { get404, daResp, getRobots } from './responses/index.js';
 import getFromAdmin from './storage/admin.js';
+import { isEmbeddableAsset } from './storage/utils.js';
 
-const EMBEDDABLE_ASSETS_EXTENSIONS = ['.avif', '.jpg', '.jpeg', '.png', '.svg', '.gif', '.mp4'];
+// https://www.aem.live/docs/security#backends-with-ip-filtering
+const HELIX_ADMIN_IP = '3.227.118.73';
 
 async function getFromStorage(pathname, env) {
   const daCtx = getDaCtx(env, pathname);
@@ -23,14 +26,28 @@ async function getFromStorage(pathname, env) {
   return daResp(objResp);
 }
 
-function isEmbeddableAsset(pathname) {
-  return EMBEDDABLE_ASSETS_EXTENSIONS.some((ext) => pathname.endsWith(ext));
-}
-// https://www.aem.live/docs/security#backends-with-ip-filtering
 function isAllowListed(env, req, org) {
   const allowedIps = env.HELIX_ADMIN_IPS?.split(',').map((ip) => ip.trim()) || [];
   return env.ADMIN_EXCEPTED_ORGS?.split(',').includes(org)
     && allowedIps.includes(req.headers.get('cf-connecting-ip'));
+}
+
+function shouldGetFromStorage(env, req, pathname, org) {
+  // When Helix Admin calls, allowlisted orgs always use storage
+  if (isAllowListed(env, req, org)) {
+    return true;
+  }
+
+  // Embeddable assets go to storage by default
+  if (isEmbeddableAsset(pathname)) {
+    // Admin opt-in orgs use admin even for embeddable assets
+    if (env.ADMIN_OPTIN_ORGS?.split(',').includes(org)) {
+      return false;
+    }
+    return true;
+  }
+
+  return false;
 }
 
 export default {
@@ -41,11 +58,15 @@ export default {
     if (pathname === '/favicon.ico') return get404();
     if (pathname === '/robots.txt') return getRobots();
 
-    const [, org, site] = url.pathname.split('/');
+    const [, org, site, root] = url.pathname.split('/');
+
+    if (root === '.gimme_cookie') {
+      return getCookie(req);
+    }
 
     if (!org || !site) return get404();
 
-    if (isEmbeddableAsset(pathname) || isAllowListed(env, req, org)) {
+    if (shouldGetFromStorage(env, req, pathname, org)) {
       return getFromStorage(pathname, env);
     }
 

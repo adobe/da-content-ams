@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Adobe. All rights reserved.
+ * Copyright 2026 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -9,46 +9,86 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { describe, it, expect } from 'vitest';
+
+/* eslint-env mocha */
+import { expect } from 'chai';
 import { daResp, get404, getRobots } from '../../src/responses/index.js';
 
 describe('daResp', () => {
-  it('returns response with CORS headers', () => {
-    const resp = daResp({ body: 'hello', status: 200, contentType: 'text/html' });
-    expect(resp.status).toBe(200);
-    expect(resp.headers.get('Access-Control-Allow-Origin')).toBe('*');
-    expect(resp.headers.get('Access-Control-Allow-Methods')).toBe('GET, OPTIONS');
-    expect(resp.headers.get('Access-Control-Allow-Headers')).toBe('authorization');
-    expect(resp.headers.get('Content-Type')).toBe('text/html');
+  it('creates response with basic properties', () => {
+    const response = daResp({ body: 'test content', status: 200 });
+
+    expect(response).to.be.instanceOf(Response);
+    expect(response.status).to.equal(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).to.equal('*');
+    expect(response.headers.get('Access-Control-Allow-Methods')).to.equal('GET, OPTIONS');
+    expect(response.headers.get('Access-Control-Allow-Headers')).to.equal('authorization');
   });
 
-  it('does not set a custom Content-Type when not provided', () => {
-    const resp = daResp({ body: '', status: 200 });
-    // Our code doesn't append Content-Type — Response constructor may add a default
-    expect(resp.headers.get('Content-Type')).not.toBe('text/html');
-    expect(resp.headers.get('Content-Type')).not.toBe('application/json');
+  it('includes content type when provided', () => {
+    const response = daResp({ body: '<html>content</html>', status: 200, contentType: 'text/html' });
+
+    expect(response.headers.get('Content-Type')).to.equal('text/html');
   });
 
-  it('sets correct status code', () => {
-    expect(daResp({ body: '', status: 201 }).status).toBe(201);
-    expect(daResp({ body: '', status: 404 }).status).toBe(404);
+  it('sets Content-Disposition: attachment for image/svg+xml', () => {
+    const resp = daResp({ body: '<svg/>', status: 200, contentType: 'image/svg+xml' });
+    expect(resp.headers.get('Content-Disposition')).to.equal('attachment');
+  });
+
+  it('sets Content-Disposition: attachment for image/svg', () => {
+    const resp = daResp({ body: '<svg/>', status: 200, contentType: 'image/svg' });
+    expect(resp.headers.get('Content-Disposition')).to.equal('attachment');
+  });
+
+  it('sets Content-Disposition: attachment for image/svg+xml with charset', () => {
+    const resp = daResp({ body: '<svg/>', status: 200, contentType: 'image/svg+xml; charset=utf-8' });
+    expect(resp.headers.get('Content-Disposition')).to.equal('attachment');
+  });
+
+  it('does not set Content-Disposition for non-SVG content types', () => {
+    const resp = daResp({ body: 'ok', status: 200, contentType: 'image/png' });
+    expect(resp.headers.get('Content-Disposition')).to.equal(null);
+  });
+
+  it('does not set Content-Disposition when contentType is missing', () => {
+    const resp = daResp({ body: '', status: 404 });
+    expect(resp.headers.get('Content-Disposition')).to.equal(null);
+  });
+
+  it('handles different status codes', () => {
+    const response = daResp({ body: 'error message', status: 404 });
+    expect(response.status).to.equal(404);
+  });
+
+  it('always includes CORS headers', () => {
+    const response = daResp({ body: 'test', status: 500 });
+    expect(response.headers.get('Access-Control-Allow-Origin')).to.equal('*');
   });
 });
 
 describe('get404', () => {
-  it('returns 404 with CORS headers', () => {
+  it('returns 404 with empty body', async () => {
     const resp = get404();
-    expect(resp.status).toBe(404);
-    expect(resp.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(resp.status).to.equal(404);
+    expect(await resp.text()).to.equal('');
+  });
+
+  it('includes CORS headers', () => {
+    const response = get404();
+    expect(response.headers.get('Access-Control-Allow-Origin')).to.equal('*');
   });
 });
 
 describe('getRobots', () => {
-  it('returns 200 with disallow-all body', async () => {
+  it('returns 200 with disallow all body', async () => {
     const resp = getRobots();
-    expect(resp.status).toBe(200);
-    const text = await resp.text();
-    expect(text).toContain('User-agent: *');
-    expect(text).toContain('Disallow: /');
+    expect(resp.status).to.equal(200);
+    expect(await resp.text()).to.include('Disallow: /');
+  });
+
+  it('includes CORS headers', () => {
+    const response = getRobots();
+    expect(response.headers.get('Access-Control-Allow-Origin')).to.equal('*');
   });
 });

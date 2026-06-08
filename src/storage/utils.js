@@ -9,6 +9,12 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+const EMBEDDABLE_ASSETS_EXTENSIONS = ['.avif', '.jpg', '.jpeg', '.png', '.svg', '.gif', '.mp4', '.ico'];
+
+export function isEmbeddableAsset(pathname) {
+  return EMBEDDABLE_ASSETS_EXTENSIONS.some((ext) => pathname.endsWith(ext));
+}
+
 export default function getS3Config(env) {
   // Construct R2 endpoint URL from account ID
   const endpoint = env.S3_DEF_URL || `https://${env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`;
