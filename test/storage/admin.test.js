@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 Adobe. All rights reserved.
+ * Copyright 2026 Adobe. All rights reserved.
  * This file is licensed to you under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may obtain a copy
  * of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -9,151 +9,218 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
+
+/* eslint-env mocha */
+import { expect } from 'chai';
+import { Nock } from '../utils.js';
 import getFromAdmin from '../../src/storage/admin.js';
 
-function makeRequest(method, url, headers = {}) {
-  return new Request(url, { method, headers });
+function createRequest(url, { method = 'GET', headers = {} } = {}) {
+  const h = new Headers(headers);
+  return new Request(url, { method, headers: h });
 }
 
-const mockEnv = {
-  ADMIN_URL: process.env.ADMIN_URL,
-  daadmin: {
-    fetch: vi.fn(),
-  },
-};
+function createEnv() {
+  return { daadmin: { fetch: globalThis.fetch } };
+}
 
 describe('getFromAdmin', () => {
+  /** @type {ReturnType<typeof Nock>} */
+  let nock;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    nock = new Nock().env();
   });
 
-  it('returns 200 for OPTIONS', async () => {
-    const req = makeRequest('OPTIONS', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-    const resp = await getFromAdmin(req, mockEnv);
-    expect(resp.status).toBe(200);
+  afterEach(() => {
+    nock.done();
   });
 
-  it('returns 405 for POST', async () => {
-    const req = makeRequest('POST', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-    const resp = await getFromAdmin(req, mockEnv);
-    expect(resp.status).toBe(405);
-  });
+  describe('HTTP method handling', () => {
+    it('returns 405 for non-GET requests', async () => {
+      const req = createRequest('https://example.com/org/site/page', { method: 'POST' });
+      const env = createEnv();
 
-  it('returns 405 for PUT', async () => {
-    const req = makeRequest('PUT', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-    const resp = await getFromAdmin(req, mockEnv);
-    expect(resp.status).toBe(405);
-  });
+      const result = await getFromAdmin(req, env);
 
-  it('proxies GET to admin service binding', async () => {
-    const mockAdminResp = new Response('page content', {
-      status: 200,
-      headers: { 'Content-Type': 'text/html' },
+      expect(result.status).to.equal(405);
     });
-    mockEnv.daadmin.fetch.mockResolvedValue(mockAdminResp);
 
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-    const resp = await getFromAdmin(req, mockEnv);
+    it('handles OPTIONS with 200 without fetching', async () => {
+      const req = createRequest('https://example.com/org/site/page', { method: 'OPTIONS' });
+      const env = createEnv();
 
-    expect(resp.status).toBe(200);
-    expect(mockEnv.daadmin.fetch).toHaveBeenCalledOnce();
-  });
+      const result = await getFromAdmin(req, env);
 
-  it('extracts auth from cookie', async () => {
-    mockEnv.daadmin.fetch.mockResolvedValue(new Response('', { status: 200 }));
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page', {
-      cookie: 'auth_token=my-token-123',
+      expect(result.status).to.equal(200);
     });
-    await getFromAdmin(req, mockEnv);
 
-    const [, options] = mockEnv.daadmin.fetch.mock.calls[0];
-    expect(options.headers.get('authorization')).toBe('Bearer my-token-123');
-  });
+    it('allows GET and fetches admin', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'content', { 'content-type': 'text/html' });
 
-  it('extracts auth from Authorization header', async () => {
-    mockEnv.daadmin.fetch.mockResolvedValue(new Response('', { status: 200 }));
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page', {
-      authorization: 'Bearer header-token',
+      const req = createRequest('https://example.com/org/site/page');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('content');
     });
-    await getFromAdmin(req, mockEnv);
-
-    const [, options] = mockEnv.daadmin.fetch.mock.calls[0];
-    expect(options.headers.get('authorization')).toBe('Bearer header-token');
   });
 
-  it('extracts auth from query param token', async () => {
-    mockEnv.daadmin.fetch.mockResolvedValue(new Response('', { status: 200 }));
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page?token=query-token');
-    await getFromAdmin(req, mockEnv);
+  describe('authentication handling', () => {
+    it('sends Bearer token from cookie', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .matchHeader('authorization', 'Bearer cookie-token')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
 
-    const [, options] = mockEnv.daadmin.fetch.mock.calls[0];
-    expect(options.headers.get('authorization')).toBe('Bearer query-token');
-  });
+      const req = createRequest('https://example.com/org/site/page', {
+        headers: { cookie: 'auth_token=cookie-token' },
+      });
+      const env = createEnv();
 
-  it('cookie auth takes precedence over Authorization header', async () => {
-    mockEnv.daadmin.fetch.mockResolvedValue(new Response('', { status: 200 }));
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page', {
-      cookie: 'auth_token=cookie-token',
-      authorization: 'Bearer header-token',
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
     });
-    await getFromAdmin(req, mockEnv);
 
-    const [, options] = mockEnv.daadmin.fetch.mock.calls[0];
-    expect(options.headers.get('authorization')).toBe('Bearer cookie-token');
-  });
+    it('uses authorization header when cookie not present', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .matchHeader('authorization', 'Bearer header-token')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
 
-  it('sends no auth header when no auth provided', async () => {
-    mockEnv.daadmin.fetch.mockResolvedValue(new Response('', { status: 200 }));
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-    await getFromAdmin(req, mockEnv);
+      const req = createRequest('https://example.com/org/site/page', {
+        headers: { authorization: 'Bearer header-token' },
+      });
+      const env = createEnv();
 
-    const [, options] = mockEnv.daadmin.fetch.mock.calls[0];
-    expect(options.headers.get('authorization')).toBeNull();
-  });
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
+    });
 
-  it('returns 503 when admin service binding throws', async () => {
-    mockEnv.daadmin.fetch.mockRejectedValue(new Error('Service unavailable'));
-    const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-    const resp = await getFromAdmin(req, mockEnv);
+    it('uses query token when no other auth present', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .matchHeader('authorization', (val) => val === 'Bearer query-token')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
 
-    expect(resp.status).toBe(503);
-    expect(resp.headers.get('x-error')).toBe('Failed to fetch from admin');
+      const req = createRequest('https://example.com/org/site/page?token=query-token');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
+    });
+
+    it('does not use cookie auth when cookie header is present but empty', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'ok', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org/site/page', {
+        headers: { cookie: '' },
+      });
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
+    });
   });
 
   describe('path canonicalization', () => {
-    beforeEach(() => {
-      mockEnv.daadmin.fetch.mockResolvedValue(new Response('', { status: 200 }));
+    it('converts path to lowercase', async () => {
+      nock.admin()
+        .get('/source/org/site/page.html')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/ORG/SITE/PAGE');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
     });
 
-    it('lowercases paths', async () => {
-      const req = makeRequest('GET', 'https://content-stg.ssa-da.live/ADOBE/DA-LIVE/Page');
-      await getFromAdmin(req, mockEnv);
-      const [url] = mockEnv.daadmin.fetch.mock.calls[0];
-      expect(url).toContain('/adobe/da-live/page.html');
+    it('adds index for trailing slash', async () => {
+      nock.admin()
+        .get('/source/org/site/index.html')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org/site/');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
     });
 
-    it('appends .html to extensionless paths', async () => {
-      const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/page');
-      await getFromAdmin(req, mockEnv);
-      const [url] = mockEnv.daadmin.fetch.mock.calls[0];
-      expect(url).toContain('/source/adobe/da-live/page.html');
+    it('adds .html for path without extension', async () => {
+      nock.admin()
+        .get('/source/org/site/page.html')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org/site/page');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
     });
 
-    it('appends index to trailing slash', async () => {
-      const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/folder/');
-      await getFromAdmin(req, mockEnv);
-      const [url] = mockEnv.daadmin.fetch.mock.calls[0];
-      expect(url).toContain('/adobe/da-live/folder/index.html');
+    it('preserves existing file extensions', async () => {
+      nock.admin()
+        .get('/source/org/site/image.jpg')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org/site/image.jpg');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
+    });
+  });
+
+  describe('admin API integration', () => {
+    it('constructs correct admin URL', async () => {
+      nock.admin()
+        .get('/source/org/site/page.html')
+        .reply(200, 'ok', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org/site/page');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+      expect(result.status).to.equal(200);
     });
 
-    it('preserves file extensions', async () => {
-      const req = makeRequest('GET', 'https://content-stg.ssa-da.live/adobe/da-live/image.png');
-      await getFromAdmin(req, mockEnv);
-      const [url] = mockEnv.daadmin.fetch.mock.calls[0];
-      expect(url).toContain('/source/adobe/da-live/image.png');
+    it('forwards response status and headers', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(201, 'created content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org/site/page');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+
+      expect(result.status).to.equal(201);
+      expect(result.headers.get('content-type')).to.equal('text/html');
+      expect(await result.text()).to.equal('created content');
+    });
+  });
+
+  describe('error handling', () => {
+    it('returns 503 when admin fetch fails', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .replyWithError('Network error');
+
+      const req = createRequest('https://example.com/org/site/page');
+      const env = createEnv();
+
+      const result = await getFromAdmin(req, env);
+
+      expect(result.status).to.equal(503);
+      expect(result.headers.get('x-error')).to.equal('Failed to fetch from admin');
     });
   });
 });

@@ -9,116 +9,259 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import {
-  describe, it, expect, vi, beforeEach,
-} from 'vitest';
-import getObject from '../src/storage/object.js';
-import getFromAdmin from '../src/storage/admin.js';
+
+/* eslint-env mocha */
+import { expect } from 'chai';
+import { Nock } from './utils.js';
 import worker from '../src/index.js';
 
-vi.mock('../src/storage/object.js', () => ({
-  default: vi.fn(),
-}));
+const HELIX_ADMIN_IPS = '34.208.108.255, 52.26.227.164';
+const HELIX_ADMIN_IP = '34.208.108.255'; // Pick one for test requests
+const S3_BASE = 'https://s3-test.local';
+const S3_BUCKET_HOST = 'https://test-bucket.s3-test.local';
 
-vi.mock('../src/storage/admin.js', () => ({
-  default: vi.fn(),
-}));
-
-const mockEnv = {
-  AEM_BUCKET_NAME: process.env.AEM_BUCKET_NAME,
-  HELIX_ADMIN_IPS: process.env.HELIX_ADMIN_IPS,
-  ADMIN_EXCEPTED_ORGS: process.env.ADMIN_EXCEPTED_ORGS,
-  CF_ACCOUNT_ID: process.env.CF_ACCOUNT_ID,
-  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
-  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
-  daadmin: { fetch: vi.fn() },
-};
-
-function makeReq(path, headers = {}) {
-  return new Request(`https://content-stg.ssa-da.live${path}`, { headers });
+function createRequest(url, { method = 'GET', headers = {} } = {}) {
+  const h = new Headers(headers);
+  return new Request(url, { method, headers: h });
 }
 
-describe('fetch handler', () => {
+function createEnv(overrides = {}) {
+  return {
+    AEM_BUCKET_NAME: 'test-bucket',
+    ADMIN_EXCEPTED_ORGS: 'org1,org2,org3',
+    HELIX_ADMIN_IPS,
+    S3_DEF_URL: S3_BASE,
+    S3_ACCESS_KEY_ID: 'test-key',
+    S3_SECRET_ACCESS_KEY: 'test-secret',
+    daadmin: { fetch: globalThis.fetch },
+    ...overrides,
+  };
+}
+
+describe('Index Tests', () => {
+  /** @type {ReturnType<typeof Nock>} */
+  let nock;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    nock = new Nock().env();
   });
 
-  it('returns 404 for /favicon.ico', async () => {
-    const resp = await worker.fetch(makeReq('/favicon.ico'), mockEnv);
-    expect(resp.status).toBe(404);
+  afterEach(() => {
+    nock.done();
   });
 
-  it('returns robots.txt for /robots.txt', async () => {
-    const resp = await worker.fetch(makeReq('/robots.txt'), mockEnv);
-    expect(resp.status).toBe(200);
-    const text = await resp.text();
-    expect(text).toContain('User-agent: *');
-  });
+  describe('robots.txt handling', () => {
+    it('returns robots.txt for /robots.txt path', async () => {
+      const req = createRequest('https://example.com/robots.txt');
+      const env = createEnv();
 
-  it('returns 404 when org is missing', async () => {
-    const resp = await worker.fetch(makeReq('/'), mockEnv);
-    expect(resp.status).toBe(404);
-  });
+      const result = await worker.fetch(req, env);
 
-  it('returns 404 when site is missing', async () => {
-    const resp = await worker.fetch(makeReq('/adobe'), mockEnv);
-    expect(resp.status).toBe(404);
-  });
-
-  it('fetches from storage for embeddable .png asset', async () => {
-    getObject.mockResolvedValue({ body: 'img', status: 200, contentType: 'image/png' });
-    await worker.fetch(makeReq('/adobe/da-live/image.png'), mockEnv);
-    expect(getObject).toHaveBeenCalled();
-    expect(getFromAdmin).not.toHaveBeenCalled();
-  });
-
-  it('fetches from storage for embeddable .jpg asset', async () => {
-    getObject.mockResolvedValue({ body: 'img', status: 200, contentType: 'image/jpeg' });
-    await worker.fetch(makeReq('/adobe/da-live/photo.jpg'), mockEnv);
-    expect(getObject).toHaveBeenCalled();
-  });
-
-  it('fetches from storage for embeddable .mp4 asset', async () => {
-    getObject.mockResolvedValue({ body: 'vid', status: 200, contentType: 'video/mp4' });
-    await worker.fetch(makeReq('/adobe/da-live/video.mp4'), mockEnv);
-    expect(getObject).toHaveBeenCalled();
-  });
-
-  it('fetches from storage for allowlisted IP + org', async () => {
-    getObject.mockResolvedValue({ body: '', status: 200, contentType: 'text/html' });
-    const allowedIp = process.env.HELIX_ADMIN_IPS.split(',')[0].trim();
-    const req = new Request('https://content-stg.ssa-da.live/adobe/da-live/page', {
-      headers: { 'cf-connecting-ip': allowedIp },
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.include('Disallow: /');
     });
-    await worker.fetch(req, mockEnv);
-    expect(getObject).toHaveBeenCalled();
-    expect(getFromAdmin).not.toHaveBeenCalled();
   });
 
-  it('proxies to admin for regular HTML requests', async () => {
-    getFromAdmin.mockResolvedValue(new Response('html', { status: 200 }));
-    const resp = await worker.fetch(makeReq('/adobe/da-live/page'), mockEnv);
-    expect(getFromAdmin).toHaveBeenCalled();
-    expect(resp.status).toBe(200);
-  });
+  describe('favicon and 404', () => {
+    it('returns 404 for favicon.ico', async () => {
+      const req = createRequest('https://example.com/favicon.ico');
+      const env = createEnv();
 
-  it('does not allowlist correct IP with non-matching org', async () => {
-    getFromAdmin.mockResolvedValue(new Response('', { status: 200 }));
-    const req = new Request('https://content-stg.ssa-da.live/unknown-org/site/page', {
-      headers: { 'cf-connecting-ip': '1.2.3.4' },
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(404);
     });
-    await worker.fetch(req, mockEnv);
-    expect(getFromAdmin).toHaveBeenCalled();
-    expect(getObject).not.toHaveBeenCalled();
+
+    it('returns 404 for missing org/site', async () => {
+      const req = createRequest('https://example.com/org');
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(404);
+    });
+
+    it('returns 404 for root path', async () => {
+      const req = createRequest('https://example.com/');
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(404);
+    });
   });
 
-  it('does not allowlist matching org with wrong IP', async () => {
-    getFromAdmin.mockResolvedValue(new Response('', { status: 200 }));
-    const req = new Request('https://content-stg.ssa-da.live/adobe/da-live/page', {
-      headers: { 'cf-connecting-ip': '9.9.9.9' },
+  describe('OPTIONS request handling', () => {
+    it('handles OPTIONS through admin (no fetch)', async () => {
+      const req = createRequest('https://example.com/org/site/page', { method: 'OPTIONS' });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
     });
-    await worker.fetch(req, mockEnv);
-    expect(getFromAdmin).toHaveBeenCalled();
-    expect(getObject).not.toHaveBeenCalled();
+  });
+
+  describe('cookie endpoint', () => {
+    it('calls getCookie for .gimme_cookie path', async () => {
+      const req = createRequest('https://example.com/org/site/.gimme_cookie', {
+        headers: { Origin: 'https://ent-da.live' },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(401);
+      expect(await result.text()).to.equal('401 Unauthorized');
+    });
+  });
+
+  describe('admin access (allowlisted vs not)', () => {
+    it('uses storage for allowlisted org with correct IP', async () => {
+      nock.s3(S3_BUCKET_HOST).get(/\/.+/).reply(200, 'storage content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org1/site/page', {
+        headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('storage content');
+    });
+
+    it('uses admin for non-excepted org', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'admin content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/other-org/site/page', {
+        headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('admin content');
+    });
+
+    it('uses admin for wrong IP even when org is excepted', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'admin content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org1/site/page', {
+        headers: { 'cf-connecting-ip': '192.168.1.2' },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('admin content');
+    });
+
+    it('uses admin when ADMIN_EXCEPTED_ORGS is missing', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'admin content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org1/site/page', {
+        headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
+      });
+      const env = createEnv();
+      delete env.ADMIN_EXCEPTED_ORGS;
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('admin content');
+    });
+  });
+
+  describe('embeddable assets (storage by default)', () => {
+    it('uses storage for .png when not allowlisted', async () => {
+      nock.s3(S3_BUCKET_HOST)
+        .get(/\/.+/)
+        .reply(200, 'fake-png-bytes', { 'content-type': 'image/png' });
+
+      const req = createRequest('https://example.com/some-org/site/logo.png', {
+        headers: { 'cf-connecting-ip': '1.2.3.4' },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('fake-png-bytes');
+    });
+
+    it('uses admin for embeddable asset when org is in ADMIN_OPTIN_ORGS', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'admin content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/optin-org/site/logo.png', {
+        headers: { 'cf-connecting-ip': '1.2.3.4' },
+      });
+      const env = createEnv({ ADMIN_OPTIN_ORGS: 'optin-org' });
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('admin content');
+    });
+
+    it('uses storage for .svg and sets Content-Disposition attachment', async () => {
+      nock.s3(S3_BUCKET_HOST)
+        .get(/\/.+/)
+        .reply(200, '<svg/>', { 'content-type': 'image/svg+xml' });
+
+      const req = createRequest('https://example.com/some-org/site/icon.svg', {
+        headers: { 'cf-connecting-ip': '1.2.3.4' },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(result.headers.get('Content-Disposition')).to.equal('attachment');
+      expect(await result.text()).to.equal('<svg/>');
+    });
+  });
+
+  describe('missing cf-connecting-ip', () => {
+    it('uses admin when cf-connecting-ip is missing', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'admin content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org1/site/page');
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('admin content');
+    });
+  });
+
+  describe('S3 errors', () => {
+    it('returns 404 when S3 returns error', async () => {
+      nock.s3(S3_BUCKET_HOST)
+        .get(/\/.+/)
+        .reply(404);
+
+      const req = createRequest('https://example.com/org1/site/missing', {
+        headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
+      });
+      const env = createEnv();
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(404);
+    });
   });
 });
