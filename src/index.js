@@ -18,7 +18,6 @@ import getFromAdmin from './storage/admin.js';
 import { isEmbeddableAsset } from './storage/utils.js';
 
 // https://www.aem.live/docs/security#backends-with-ip-filtering
-const HELIX_ADMIN_IP = '3.227.118.73';
 
 async function getFromStorage(pathname, env) {
   const daCtx = getDaCtx(env, pathname);

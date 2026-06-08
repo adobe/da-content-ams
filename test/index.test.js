@@ -29,7 +29,7 @@ function createEnv(overrides = {}) {
   return {
     AEM_BUCKET_NAME: 'test-bucket',
     ADMIN_EXCEPTED_ORGS: 'org1,org2,org3',
-    HELIX_ADMIN_IPS: HELIX_ADMIN_IPS,
+    HELIX_ADMIN_IPS,
     S3_DEF_URL: S3_BASE,
     S3_ACCESS_KEY_ID: 'test-key',
     S3_SECRET_ACCESS_KEY: 'test-secret',
