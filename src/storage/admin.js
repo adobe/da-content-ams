@@ -99,11 +99,11 @@ export default async function getFromAdmin(req, env) {
     const resp = await env.daadmin.fetch(url, {
       headers: reqHeaders,
     });
-
     const { status, headers } = resp;
+    const contentType = headers.get('content-type');
     // eslint-disable-next-line no-console
     console.log('<- admin responded with:', status);
-    return new Response(resp.body, { status, headers });
+    return daResp({ body: resp.body, status, contentType });
   } catch (e) {
     const msg = 'Failed to fetch from admin';
     // eslint-disable-next-line no-console
