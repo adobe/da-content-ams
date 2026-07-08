@@ -13,6 +13,8 @@ import { daResp } from './responses/index.js';
 
 export const TRUSTED_ORIGINS = [
   'https://da.live',
+  'https://preview-aemcoder.adobe.io',
+  'https://preview-excat-stage.adobe.io',
   'http://localhost:3000',
 ];
 
