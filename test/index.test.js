@@ -15,8 +15,8 @@ import { expect } from 'chai';
 import { Nock } from './utils.js';
 import worker from '../src/index.js';
 
-const HELIX_ADMIN_IPS = '34.208.108.255, 52.26.227.164';
-const HELIX_ADMIN_IP = '34.208.108.255'; // Pick one for test requests
+const HELIX_ADMIN_IPS = '16.54.110.94, 3.98.254.16';
+const HELIX_ADMIN_IP = '16.54.110.94'; // Pick one for test requests
 const S3_BASE = 'https://s3-test.local';
 const S3_BUCKET_HOST = 'https://test-bucket.s3-test.local';
 
@@ -105,7 +105,7 @@ describe('Index Tests', () => {
   describe('cookie endpoint', () => {
     it('calls getCookie for .gimme_cookie path', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
-        headers: { Origin: 'https://ent-da.live' },
+        headers: { Origin: 'https://entmseds-da.live' },
       });
       const env = createEnv();
 

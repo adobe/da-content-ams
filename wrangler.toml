@@ -2,6 +2,9 @@ name = "da-content-ams"
 main = "src/index.js"
 compatibility_date = "2026-03-04"
 
+workers_dev = false
+preview_urls = false
+
 # Note: account_id and keep_vars are set per environment below
 
 # [secrets]
@@ -90,6 +93,66 @@ CF_ACCOUNT_ID = "ff68e0f71563bc546fedcfda6bd8e5ca"
 # Helix Admin IP whitelist (comma-separated) - https://www.aem.live/docs/security#backends-with-ip-filtering
 # 34.208.108.255, 52.26.227.164 // NAT Gateway IPs for ent-aem Lambda functions (us-west-2)
 HELIX_ADMIN_IPS = "34.208.108.255, 52.26.227.164"
+
+# S3_ACCESS_KEY_ID = "set via wrangler secret put"
+# S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
+
+# === EDS-EU ENVIRONMENT ===
+########################################################
+[env.eds-eu]
+account_id = "ff68e0f71563bc546fedcfda6bd8e5ca"
+keep_vars = true
+routes = [
+  { pattern = "content.eumseds-da.live/*", zone_name = "eumseds-da.live" }
+]
+
+services = [
+  { binding = "daadmin", service = "da-admin-ams-eds-eu" }
+]
+
+[env.eds-eu.vars]
+ENVIRONMENT = "eds-eu"
+AEM_BUCKET_NAME = "aem-content-eds-eu"
+ADMIN_URL = "admin.eumseds-da.live"
+ADMIN_EXCEPTED_ORGS = "adobe,ams-eds,ssa-eds"
+CF_ACCOUNT_ID = "ff68e0f71563bc546fedcfda6bd8e5ca"
+
+# Helix Admin IP whitelist (comma-separated) - https://www.aem.live/docs/security#backends-with-ip-filtering
+# 34.208.108.255, 52.26.227.164 // NAT Gateway IPs for ent-aem Lambda functions (us-west-2)
+HELIX_ADMIN_IPS = "3.121.97.239"
+
+# S3_ACCESS_KEY_ID = "set via wrangler secret put"
+# S3_SECRET_ACCESS_KEY = "set via wrangler secret put"
+
+# === EDS-CA ENVIRONMENT ===
+########################################################
+[env.eds-ca]
+account_id = "ff68e0f71563bc546fedcfda6bd8e5ca"
+keep_vars = true
+routes = [
+  { pattern = "content.entmseds-da.live/*", zone_name = "entmseds-da.live" }
+]
+
+services = [
+  { binding = "daadmin", service = "da-admin-ams-eds-ca" }
+]
+
+[env.eds-ca.vars]
+ENVIRONMENT = "eds-ca"
+AEM_BUCKET_NAME = "aem-content-eds-ca"
+ADMIN_URL = "admin.entmseds-da.live"
+ADMIN_EXCEPTED_ORGS = "adobe,ams-eds,ssa-eds"
+CF_ACCOUNT_ID = "ff68e0f71563bc546fedcfda6bd8e5ca"
+
+# Helix Admin IP whitelist (comma-separated) - https://www.aem.live/docs/security#backends-with-ip-filtering
+# These are the NAT Gateway IPs for the VPC that helix-admin-ams runs in (ca-central-1).
+# IMPORTANT: document previews are fetched by the helix-html2md-ams Lambda, which fetches the
+# source from this worker. IP filtering only works if html2md egresses from these IPs — i.e.
+# html2md MUST be attached to the same VPC/NAT gateway as helix-admin. If html2md is NOT in the
+# VPC it egresses via AWS's shared ca-central-1 Lambda pool (rotating IPs e.g. 35.182.x / 15.222.x),
+# which can never be whitelisted → document preview returns 401 (media/embeddable assets still work,
+# they bypass the IP check). Fix in ams-eds-terraform: give helix-html2md-ams the same vpc_config.
+HELIX_ADMIN_IPS = "16.54.110.94, 3.98.254.16"
 
 # S3_ACCESS_KEY_ID = "set via wrangler secret put"
 # S3_SECRET_ACCESS_KEY = "set via wrangler secret put"

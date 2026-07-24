@@ -12,7 +12,8 @@
 import { daResp } from './responses/index.js';
 
 export const TRUSTED_ORIGINS = [
-  'https://ent-da.live',
+  'https://entmseds-da.live',
+  'https://entmseds-da.page',
   'http://localhost:3000',
 ];
 
@@ -25,7 +26,7 @@ export const DEFAULT_CORS_HEADERS = {
 
 /**
  * Check if the origin is trusted.
- * Supports exact matches and pattern matching for DA ent-aem.live and ent-aem.page domains.
+ * Supports exact matches and pattern matching for DA entmseds.live and entmseds.page domains.
  */
 function isTrustedOrigin(origin) {
   if (!origin) return false;
@@ -35,8 +36,7 @@ function isTrustedOrigin(origin) {
     return true;
   }
 
-  // Check pattern: https://<alphanumeric>--ent-da-live--ssa-eds.ent-aem.(live|page)
-  const pattern = /^https:\/\/[a-zA-Z0-9]+-?-ent-da-live--ssa-eds\.ent-aem\.(live|page)$/;
+  const pattern = /^https:\/\/[a-zA-Z0-9-]+--hlx6-da-live--ssa-eds\.entmseds\.(live|page)$/;
   return pattern.test(origin);
 }
 
