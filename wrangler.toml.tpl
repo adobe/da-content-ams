@@ -18,32 +18,32 @@
 # Secrets (S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY) are pushed via `wrangler secret
 # put` by ams-eds-terraform's populate-secrets.sh — not templated here.
 
-name = "da-content-ams-tf-poc"
+name = "da-content-ams-${NODE_ENV}"
 main = "src/index.js"
 compatibility_date = "2026-03-04"
-account_id = "ff68e0f71563bc546fedcfda6bd8e5ca"
+account_id = "${CLOUDFLARE_ACCOUNT_ID}"
 keep_vars = true
 workers_dev = false
 preview_urls = false
 
 routes = [
-  { pattern = "content.adobems-da.live/*", zone_name = "adobems-da.live" }
+  { pattern = "content.${DA_DOMAIN}/*", zone_name = "${DA_DOMAIN}" }
 ]
 
 services = [
-  { binding = "daadmin", service = "da-admin-ams-tf-poc" }
+  { binding = "daadmin", service = "da-admin-ams-${NODE_ENV}" }
 ]
 
 [dev]
 port = 8788
 
 [vars]
-ENVIRONMENT = "tf-poc"
-AEM_BUCKET_NAME = "aem-content-tf-poc"
-ADMIN_URL = "admin.adobems-da.live"
+ENVIRONMENT = "${NODE_ENV}"
+AEM_BUCKET_NAME = "${AEM_BUCKET_NAME}"
+ADMIN_URL = "admin.${DA_DOMAIN}"
 ADMIN_EXCEPTED_ORGS = "adobe,ams-eds,ssa-eds"
-CF_ACCOUNT_ID = "ff68e0f71563bc546fedcfda6bd8e5ca"
+CF_ACCOUNT_ID = "${CLOUDFLARE_ACCOUNT_ID}"
 
 # Helix Admin IP allowlist (comma-separated NAT egress IPs of helix3--admin).
 # https://www.aem.live/docs/security#backends-with-ip-filtering
-HELIX_ADMIN_IPS = "52.8.104.105, 54.241.100.49"
+HELIX_ADMIN_IPS = "${HELIX_ADMIN_IPS}"
