@@ -27,6 +27,10 @@ export default defineConfig([
     'vitest.config.js',
   ]),
   {
+    rules: {
+      // console.log is the only means of logging in a cloudflare worker
+      'no-console': 'off',
+    },
     extends: [recommended],
   },
   source,
