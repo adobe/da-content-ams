@@ -14,9 +14,17 @@
 //   source path/to/gov-stage.env && npm test
 process.env.AEM_BUCKET_NAME = process.env.AEM_BUCKET_NAME || 'BAD_VAR_da_content_ams_AEM_BUCKET_NAME';
 process.env.CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || 'BAD_VAR_da_content_ams_CF_ACCOUNT_ID';
-process.env.ADMIN_URL = process.env.ADMIN_URL || 'BAD_VAR_da_content_ams_ADMIN_URL';
 process.env.HELIX_ADMIN_IPS = process.env.HELIX_ADMIN_IPS || 'BAD_VAR_da_content_ams_HELIX_ADMIN_IPS';
 process.env.ADMIN_EXCEPTED_ORGS = process.env.ADMIN_EXCEPTED_ORGS || 'BAD_VAR_da_content_ams_ADMIN_EXCEPTED_ORGS';
+
+export const ADMIN_URL = process.env.ADMIN_URL || 'BAD_VAR_da_content_ams_ADMIN_URL';
+export const DA_DOMAIN = process.env.DA_DOMAIN || 'BAD_VAR_da_content_ams_DA_DOMAIN';
+export const HLX_PROD_SERVER_HOST_LIVE = process.env.HLX_PROD_SERVER_HOST_LIVE
+  || 'BAD_VAR_da_content_ams_HLX_PROD_SERVER_HOST_LIVE';
+export const HLX_PROD_SERVER_HOST_PAGE = process.env.HLX_PROD_SERVER_HOST_PAGE
+  || 'BAD_VAR_da_content_ams_HLX_PROD_SERVER_HOST_PAGE';
+export const GITHUB_ORG = process.env.GITHUB_ORG || 'BAD_VAR_da_content_ams_GITHUB_ORG';
+export const DA_LIVE_REPO = process.env.DA_LIVE_REPO || 'BAD_VAR_da_content_ams_DA_LIVE_REPO';
 
 // Secrets — use BAD_VAR sentinel so failures are loud, not silent
 process.env.S3_ACCESS_KEY_ID = process.env.S3_ACCESS_KEY_ID || 'BAD_VAR_da_content_S3_ACCESS_KEY_ID';

@@ -12,8 +12,9 @@
 
 // eslint-disable-next-line import/no-extraneous-dependencies
 import nock from 'nock';
+import { ADMIN_URL } from './setup-env.js';
 
-const ADMIN_BASE = 'https://admin.ent-da.live';
+const ADMIN_BASE = `https://${ADMIN_URL}`;
 
 /**
  * Nock helper for mocking HTTP in tests (helix-api-service style).

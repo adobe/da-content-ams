@@ -14,7 +14,7 @@ import { daResp } from '../responses/index.js';
 import { isEmbeddableAsset } from './utils.js';
 
 // Admin URL configuration
-const getAdminUrl = (env) => `https://${env.ADMIN_URL || 'admin.ent-da.live'}`;
+const getAdminUrl = (env) => `https://${env.ADMIN_URL || 'BAD_VAR_da_content_ams_ADMIN_URL'}`;
 
 function getAuthCookie(req) {
   if (!req.headers.has('cookie')) return null;

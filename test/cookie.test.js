@@ -12,7 +12,17 @@
 
 /* eslint-env mocha */
 import { expect } from 'chai';
-import { getCookie, TRUSTED_ORIGINS, DEFAULT_CORS_HEADERS } from '../src/cookie.js';
+import {
+  getCookie, getTrustedOrigins, DEFAULT_CORS_HEADERS,
+} from '../src/cookie.js';
+import {
+  DA_DOMAIN, HLX_PROD_SERVER_HOST_LIVE, HLX_PROD_SERVER_HOST_PAGE, GITHUB_ORG, DA_LIVE_REPO,
+} from './setup-env.js';
+
+const TEST_ENV = {
+  DA_DOMAIN, HLX_PROD_SERVER_HOST_LIVE, HLX_PROD_SERVER_HOST_PAGE, GITHUB_ORG, DA_LIVE_REPO,
+};
+const TRUSTED_ORIGIN = `https://${DA_DOMAIN}`;
 
 function createRequest(url, { method = 'GET', headers = {} } = {}) {
   const h = new Headers(headers);
@@ -23,7 +33,7 @@ describe('getCookie', () => {
   describe('origin validation', () => {
     it('returns 403 when Origin header is missing', () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie');
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(403);
       expect(result.headers.get('Content-Type')).to.equal('text/plain');
     });
@@ -32,15 +42,15 @@ describe('getCookie', () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         headers: { Origin: 'https://evil.com' },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(403);
     });
 
-    it('accepts exact trusted origin https://entmseds-da.live', async () => {
+    it('accepts exact trusted origin (DA_DOMAIN)', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
-        headers: { Origin: 'https://entmseds-da.live' },
+        headers: { Origin: TRUSTED_ORIGIN },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(401);
     });
 
@@ -48,23 +58,23 @@ describe('getCookie', () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         headers: { Origin: 'http://localhost:3000' },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(401);
     });
 
-    it('accepts pattern origin https://X--hlx6-da-live--ssa-eds.entmseds.live', async () => {
+    it('accepts pattern origin https://X--<repo>--<org>.<preview-domain>.live', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
-        headers: { Origin: 'https://main--hlx6-da-live--ssa-eds.entmseds.live' },
+        headers: { Origin: `https://main--${DA_LIVE_REPO}--${GITHUB_ORG}.${HLX_PROD_SERVER_HOST_LIVE}` },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(401);
     });
 
-    it('accepts pattern origin https://X--hlx6-da-live--ssa-eds.entmseds.page', async () => {
+    it('accepts pattern origin https://X--<repo>--<org>.<preview-domain>.page', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
-        headers: { Origin: 'https://main--hlx6-da-live--ssa-eds.entmseds.page' },
+        headers: { Origin: `https://main--${DA_LIVE_REPO}--${GITHUB_ORG}.${HLX_PROD_SERVER_HOST_PAGE}` },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(401);
     });
   });
@@ -73,20 +83,20 @@ describe('getCookie', () => {
     it('returns 405 for POST', () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         method: 'POST',
-        headers: { Origin: 'https://entmseds-da.live' },
+        headers: { Origin: TRUSTED_ORIGIN },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(405);
     });
 
     it('returns 200 with CORS headers for OPTIONS', () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         method: 'OPTIONS',
-        headers: { Origin: 'https://entmseds-da.live' },
+        headers: { Origin: TRUSTED_ORIGIN },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(200);
-      expect(result.headers.get('Access-Control-Allow-Origin')).to.equal('https://entmseds-da.live');
+      expect(result.headers.get('Access-Control-Allow-Origin')).to.equal(TRUSTED_ORIGIN);
       expect(result.headers.get('Access-Control-Allow-Credentials')).to.equal('true');
     });
   });
@@ -94,9 +104,9 @@ describe('getCookie', () => {
   describe('cookie setting', () => {
     it('returns 401 when no Authorization header', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
-        headers: { Origin: 'https://entmseds-da.live' },
+        headers: { Origin: TRUSTED_ORIGIN },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(401);
       expect(await result.text()).to.equal('401 Unauthorized');
     });
@@ -104,11 +114,11 @@ describe('getCookie', () => {
     it('sets cookie and returns 200 when Authorization Bearer has valid token', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         headers: {
-          Origin: 'https://entmseds-da.live',
+          Origin: TRUSTED_ORIGIN,
           Authorization: 'Bearer my-valid-token-123',
         },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(200);
       expect(await result.text()).to.equal('cookie set');
       const setCookie = result.headers.get('Set-Cookie');
@@ -122,11 +132,11 @@ describe('getCookie', () => {
     it('sanitizes token and sets cookie when token has allowed chars', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         headers: {
-          Origin: 'https://entmseds-da.live',
+          Origin: TRUSTED_ORIGIN,
           Authorization: 'Bearer token_with-dots.and=signs',
         },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(200);
       const setCookie = result.headers.get('Set-Cookie');
       expect(setCookie).to.include('auth_token=token_with-dots.and=signs');
@@ -135,20 +145,21 @@ describe('getCookie', () => {
     it('returns 401 when Bearer token is empty after sanitization', () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         headers: {
-          Origin: 'https://entmseds-da.live',
+          Origin: TRUSTED_ORIGIN,
           Authorization: 'Bearer ???!!!',
         },
       });
-      const result = getCookie(req);
+      const result = getCookie(req, TEST_ENV);
       expect(result.status).to.equal(401);
     });
   });
 });
 
-describe('TRUSTED_ORIGINS', () => {
-  it('includes ent-da.live and localhost', () => {
-    expect(TRUSTED_ORIGINS).to.include('https://entmseds-da.live');
-    expect(TRUSTED_ORIGINS).to.include('http://localhost:3000');
+describe('getTrustedOrigins', () => {
+  it('includes DA_DOMAIN and localhost', () => {
+    const origins = getTrustedOrigins(TEST_ENV);
+    expect(origins).to.include(TRUSTED_ORIGIN);
+    expect(origins).to.include('http://localhost:3000');
   });
 });
 

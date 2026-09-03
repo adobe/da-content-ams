@@ -14,6 +14,10 @@
 import { expect } from 'chai';
 import { Nock } from './utils.js';
 import worker from '../src/index.js';
+import {
+  ADMIN_URL, DA_DOMAIN, HLX_PROD_SERVER_HOST_LIVE, HLX_PROD_SERVER_HOST_PAGE, GITHUB_ORG,
+  DA_LIVE_REPO,
+} from './setup-env.js';
 
 const HELIX_ADMIN_IPS = '16.54.110.94, 3.98.254.16';
 const HELIX_ADMIN_IP = '16.54.110.94'; // Pick one for test requests
@@ -30,6 +34,12 @@ function createEnv(overrides = {}) {
     AEM_BUCKET_NAME: 'test-bucket',
     ADMIN_EXCEPTED_ORGS: 'org1,org2,org3',
     HELIX_ADMIN_IPS,
+    ADMIN_URL,
+    DA_DOMAIN,
+    HLX_PROD_SERVER_HOST_LIVE,
+    HLX_PROD_SERVER_HOST_PAGE,
+    GITHUB_ORG,
+    DA_LIVE_REPO,
     S3_DEF_URL: S3_BASE,
     S3_ACCESS_KEY_ID: 'test-key',
     S3_SECRET_ACCESS_KEY: 'test-secret',
@@ -105,7 +115,7 @@ describe('Index Tests', () => {
   describe('cookie endpoint', () => {
     it('calls getCookie for .gimme_cookie path', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
-        headers: { Origin: 'https://entmseds-da.live' },
+        headers: { Origin: `https://${DA_DOMAIN}` },
       });
       const env = createEnv();
 
