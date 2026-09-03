@@ -14,6 +14,7 @@
 import { expect } from 'chai';
 import { Nock } from '../utils.js';
 import getFromAdmin from '../../src/storage/admin.js';
+import { ADMIN_URL } from '../setup-env.js';
 
 function createRequest(url, { method = 'GET', headers = {} } = {}) {
   const h = new Headers(headers);
@@ -21,7 +22,7 @@ function createRequest(url, { method = 'GET', headers = {} } = {}) {
 }
 
 function createEnv() {
-  return { daadmin: { fetch: globalThis.fetch } };
+  return { ADMIN_URL, daadmin: { fetch: globalThis.fetch } };
 }
 
 describe('getFromAdmin', () => {

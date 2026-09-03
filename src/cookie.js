@@ -11,12 +11,6 @@
  */
 import { daResp } from './responses/index.js';
 
-export const TRUSTED_ORIGINS = [
-  'https://entmseds-da.live',
-  'https://entmseds-da.page',
-  'http://localhost:3000',
-];
-
 export const DEFAULT_CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
@@ -25,23 +19,35 @@ export const DEFAULT_CORS_HEADERS = {
 };
 
 /**
- * Check if the origin is trusted.
- * Supports exact matches and pattern matching for DA entmseds.live and entmseds.page domains.
+ * Trusted origins for this environment, derived from DA_DOMAIN
+ * (e.g. "entmseds-da.live" -> also trusts "entmseds-da.page").
  */
-function isTrustedOrigin(origin) {
+export function getTrustedOrigins(env) {
+  return [
+    `https://${env.DA_DOMAIN}`,
+    `https://${env.DA_DOMAIN.replace(/\.live$/, '.page')}`,
+    'http://localhost:3000',
+  ];
+}
+
+/**
+ * Check if the origin is trusted.
+ * Supports exact matches and pattern matching for DA <base>.live and <base>.page domains.
+ */
+function isTrustedOrigin(origin, env) {
   if (!origin) return false;
 
   // Check exact matches
-  if (TRUSTED_ORIGINS.includes(origin)) {
+  if (getTrustedOrigins(env).includes(origin)) {
     return true;
   }
 
-  const pattern = /^https:\/\/[a-zA-Z0-9-]+--hlx6-da-live--ssa-eds\.entmseds\.(live|page)$/;
+  const pattern = new RegExp(`^https://[a-zA-Z0-9-]+--${env.DA_LIVE_REPO}--${env.GITHUB_ORG}\\.(${env.HLX_PROD_SERVER_HOST_LIVE}|${env.HLX_PROD_SERVER_HOST_PAGE})$`);
   return pattern.test(origin);
 }
 
-export function getCookie(req) {
-  if (!isTrustedOrigin(req.headers.get('Origin'))) {
+export function getCookie(req, env) {
+  if (!isTrustedOrigin(req.headers.get('Origin'), env)) {
     return daResp({ body: '403 Forbidden', status: 403, contentType: 'text/plain' });
   }
 
