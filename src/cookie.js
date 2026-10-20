@@ -11,6 +11,11 @@
  */
 import { daResp } from './responses/index.js';
 
+export const TRUSTED_ORIGINS = [
+  'https://da.live',
+  'http://localhost:3000',
+];
+
 export const DEFAULT_CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
@@ -21,8 +26,10 @@ export const DEFAULT_CORS_HEADERS = {
 /**
  * Trusted origins for this environment, derived from DA_DOMAIN
  * (e.g. "entmseds-da.live" -> also trusts "entmseds-da.page").
+ * Returns undefined when DA_DOMAIN is unset, so callers fall back to TRUSTED_ORIGINS.
  */
 export function getTrustedOrigins(env) {
+  if (!env?.DA_DOMAIN) return undefined;
   return [
     `https://${env.DA_DOMAIN}`,
     `https://${env.DA_DOMAIN.replace(/\.live$/, '.page')}`,
@@ -31,18 +38,34 @@ export function getTrustedOrigins(env) {
 }
 
 /**
+ * Trusted origin pattern for this environment: https://<ref>--<DA_LIVE_REPO>--<GITHUB_ORG>
+ * on HLX_PROD_SERVER_HOST_LIVE/_PAGE. Returns undefined unless all four are set.
+ */
+function getTrustedOriginPattern(env) {
+  const {
+    DA_LIVE_REPO, GITHUB_ORG, HLX_PROD_SERVER_HOST_LIVE, HLX_PROD_SERVER_HOST_PAGE,
+  } = env || {};
+  if (!(DA_LIVE_REPO && GITHUB_ORG && HLX_PROD_SERVER_HOST_LIVE && HLX_PROD_SERVER_HOST_PAGE)) {
+    return undefined;
+  }
+  return new RegExp(`^https://[a-zA-Z0-9-]+--${DA_LIVE_REPO}--${GITHUB_ORG}\\.(${HLX_PROD_SERVER_HOST_LIVE}|${HLX_PROD_SERVER_HOST_PAGE})$`);
+}
+
+/**
  * Check if the origin is trusted.
- * Supports exact matches and pattern matching for DA <base>.live and <base>.page domains.
+ * Supports exact matches and pattern matching for DA aem.live and aem.page domains.
  */
 function isTrustedOrigin(origin, env) {
   if (!origin) return false;
 
   // Check exact matches
-  if (getTrustedOrigins(env).includes(origin)) {
+  if ((getTrustedOrigins(env) || TRUSTED_ORIGINS).includes(origin)) {
     return true;
   }
 
-  const pattern = new RegExp(`^https://[a-zA-Z0-9-]+--${env.DA_LIVE_REPO}--${env.GITHUB_ORG}\\.(${env.HLX_PROD_SERVER_HOST_LIVE}|${env.HLX_PROD_SERVER_HOST_PAGE})$`);
+  // Check pattern: https://<alphanumeric>--da-live--adobe.aem.(live|page)
+  const pattern = getTrustedOriginPattern(env)
+    || /^https:\/\/[a-zA-Z0-9]+-?-da-live--adobe\.aem\.(live|page)$/;
   return pattern.test(origin);
 }
 

@@ -18,6 +18,7 @@ import getFromAdmin from './storage/admin.js';
 import { isEmbeddableAsset } from './storage/utils.js';
 
 // https://www.aem.live/docs/security#backends-with-ip-filtering
+const HELIX_ADMIN_IP = '3.227.118.73';
 
 async function getFromStorage(pathname, env) {
   const daCtx = getDaCtx(env, pathname);
@@ -26,7 +27,7 @@ async function getFromStorage(pathname, env) {
 }
 
 function isAllowListed(env, req, org) {
-  const allowedIps = env.HELIX_ADMIN_IPS?.split(',').map((ip) => ip.trim()) || [];
+  const allowedIps = env.HELIX_ADMIN_IPS?.split(',').map((ip) => ip.trim()) || [HELIX_ADMIN_IP];
   return env.ADMIN_EXCEPTED_ORGS?.split(',').includes(org)
     && allowedIps.includes(req.headers.get('cf-connecting-ip'));
 }

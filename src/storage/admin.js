@@ -13,8 +13,8 @@ import { parse } from 'cookie';
 import { daResp } from '../responses/index.js';
 import { isEmbeddableAsset } from './utils.js';
 
-// Admin URL configuration
-const getAdminUrl = (env) => `https://${env.ADMIN_URL || 'BAD_VAR_da_content_ams_ADMIN_URL'}`;
+const AMDMIN_URL = 'https://admin.da.live/source';
+const getAdminUrl = (env) => (env.ADMIN_URL && `https://${env.ADMIN_URL}/source`) || AMDMIN_URL;
 
 function getAuthCookie(req) {
   if (!req.headers.has('cookie')) return null;
@@ -86,7 +86,7 @@ export default async function getFromAdmin(req, env) {
   pathname = canonicalizePathname(pathname);
 
   // construct request to admin
-  const url = `${getAdminUrl(env)}/source${pathname}`;
+  const url = `${getAdminUrl(env)}${pathname}`;
   const reqHeaders = new Headers();
 
   const authHeader = getAuthHeader(req);
