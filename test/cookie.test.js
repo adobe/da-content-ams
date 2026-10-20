@@ -13,7 +13,7 @@
 /* eslint-env mocha */
 import { expect } from 'chai';
 import {
-  getCookie, getTrustedOrigins, DEFAULT_CORS_HEADERS,
+  getCookie, getTrustedOrigins, TRUSTED_ORIGINS, DEFAULT_CORS_HEADERS,
 } from '../src/cookie.js';
 import {
   DA_DOMAIN, HLX_PROD_SERVER_HOST_LIVE, HLX_PROD_SERVER_HOST_PAGE, GITHUB_ORG, DA_LIVE_REPO,
@@ -160,6 +160,21 @@ describe('getTrustedOrigins', () => {
     const origins = getTrustedOrigins(TEST_ENV);
     expect(origins).to.include(TRUSTED_ORIGIN);
     expect(origins).to.include('http://localhost:3000');
+  });
+
+  it('falls back to upstream TRUSTED_ORIGINS and pattern when env is unset', () => {
+    expect(getTrustedOrigins({})).to.equal(undefined);
+    ['https://da.live', 'https://main-da-live--adobe.aem.live'].forEach((Origin) => {
+      const req = createRequest('https://example.com/org/site/.gimme_cookie', { headers: { Origin } });
+      expect(getCookie(req, {}).status).to.equal(401);
+    });
+  });
+});
+
+describe('TRUSTED_ORIGINS', () => {
+  it('includes da.live and localhost', () => {
+    expect(TRUSTED_ORIGINS).to.include('https://da.live');
+    expect(TRUSTED_ORIGINS).to.include('http://localhost:3000');
   });
 });
 
