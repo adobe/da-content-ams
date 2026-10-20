@@ -1,7 +1,7 @@
 name: Path 2 - AMS Merge Sync
 
 # Syncs adobe/da-content-ams (main) → adobe/da-content-ams (main-ams)
-# Merges whenever main's release version changes (major, minor, or patch)
+# Merges whenever main has commits not yet in main-ams (SHA-based -- see version_check)
 # Triggered automatically by Path 1 completing, or manually
 # Weekly schedule removed -- Path 1's daily sync is the only automatic trigger now.
 
@@ -132,14 +132,17 @@ jobs:
           #   echo "is_minor=true" >> $GITHUB_OUTPUT
           #   echo "trigger_reason=Weekly schedule" >> $GITHUB_OUTPUT
           #   echo "📅 Weekly scheduled sync — proceeding with AMS merge."
-          elif [ "$LATEST" != "$AMS_VERSION" ]; then
+          # da-content-ams differs from the standard template here: upstream adobe/da-content
+          # has no versioned releases (package.json stays at 0.0.0), so a version-diff check
+          # would never fire. Proceed whenever main has commits not yet in main-ams instead.
+          elif ! git merge-base --is-ancestor origin/${{ env.SOURCE_BRANCH }} HEAD; then
             echo "is_minor=true" >> $GITHUB_OUTPUT
-            echo "trigger_reason=Release updated ($AMS_VERSION → $LATEST)" >> $GITHUB_OUTPUT
-            echo "✅ New release on main: main=$LATEST, main-ams=$AMS_VERSION — proceeding with AMS merge."
+            echo "trigger_reason=New commits on ${{ env.SOURCE_BRANCH }}" >> $GITHUB_OUTPUT
+            echo "✅ ${{ env.SOURCE_BRANCH }} has commits not in ${{ env.AMS_BRANCH }} — proceeding with AMS merge."
           else
             echo "is_minor=false" >> $GITHUB_OUTPUT
-            echo "trigger_reason=No new release — skipped" >> $GITHUB_OUTPUT
-            echo "⏭️ Same version ($LATEST) — skipping AMS merge."
+            echo "trigger_reason=No new commits — skipped" >> $GITHUB_OUTPUT
+            echo "⏭️ ${{ env.AMS_BRANCH }} already contains ${{ env.SOURCE_BRANCH }} — skipping AMS merge."
           fi
 
       - name: Check for Changes to Merge
@@ -281,7 +284,7 @@ jobs:
               "text": "⚠️ *Path 2 AMS Merge Conflict!*\n*Repo:* `${{ github.repository }}`\n*Version:* `${{ steps.version_check.outputs.latest_tag }}`\nCould not merge `${{ env.SOURCE_BRANCH }}` into `${{ env.AMS_BRANCH }}`.\n\nIssues are disabled on this repo (no tracking issue) -- resolve manually: fetch, merge, fix conflicts, push to `${{ env.AMS_BRANCH }}`, then re-run.\n*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Failed Run>"
             }
 
-      - name: Notify Slack on Skipped (no new release)
+      - name: Notify Slack on Skipped (no new commits)
         if: steps.version_check.outputs.is_minor == 'false'
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -289,7 +292,7 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": "⏭️ *Path 2 Skipped — No New Release*\n*Repo:* `${{ github.repository }}`\n*`main` version:* `${{ steps.version_check.outputs.latest_tag }}` (unchanged — no merge needed)\n*`${{ env.AMS_BRANCH }}` version:* `${{ steps.version_check.outputs.ams_tag }}` (current, unchanged)\n*Next sync:* when main's release version next changes, or force_sync manually"
+              "text": "⏭️ *Path 2 Skipped — No New Commits*\n*Repo:* `${{ github.repository }}`\n`${{ env.AMS_BRANCH }}` already contains `${{ env.SOURCE_BRANCH }}` (no merge needed)\n*Next sync:* when Path 1 mirrors new upstream commits, or force_sync manually"
             }
 
       - name: Notify Slack on No Changes
