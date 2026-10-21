@@ -173,6 +173,23 @@ describe('Index Tests', () => {
       expect(await result.text()).to.equal('admin content');
     });
 
+    it('falls back to the default admin IP when HELIX_ADMIN_IPS is missing', async () => {
+      nock.admin()
+        .get(/\/source\/.+/)
+        .reply(200, 'admin content', { 'content-type': 'text/html' });
+
+      const req = createRequest('https://example.com/org1/site/page', {
+        headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
+      });
+      const env = createEnv();
+      delete env.HELIX_ADMIN_IPS;
+
+      const result = await worker.fetch(req, env);
+
+      expect(result.status).to.equal(200);
+      expect(await result.text()).to.equal('admin content');
+    });
+
     it('uses admin when ADMIN_EXCEPTED_ORGS is missing', async () => {
       nock.admin()
         .get(/\/source\/.+/)

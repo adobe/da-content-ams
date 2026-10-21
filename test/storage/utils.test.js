@@ -15,6 +15,11 @@ import { expect } from 'chai';
 import getS3Config from '../../src/storage/utils.js';
 
 describe('getS3Config', () => {
+  it('derives the R2 endpoint from CF_ACCOUNT_ID when S3_DEF_URL is unset', () => {
+    const result = getS3Config({ CF_ACCOUNT_ID: 'acct123' });
+    expect(result.endpoint).to.equal('https://acct123.r2.cloudflarestorage.com');
+  });
+
   it('returns correct S3 configuration', () => {
     const mockEnv = {
       S3_DEF_URL: 'https://test-s3-endpoint.com',

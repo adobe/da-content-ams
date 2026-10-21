@@ -202,3 +202,10 @@ describe('DEFAULT_CORS_HEADERS', () => {
     expect(DEFAULT_CORS_HEADERS['Content-Type']).to.equal('text/plain');
   });
 });
+
+describe('getCookie with undefined env', () => {
+  it('rejects an untrusted origin without throwing', () => {
+    const req = createRequest('https://example.com/x', { headers: { Origin: 'https://evil.example' } });
+    expect(getCookie(req, undefined).status).to.equal(403);
+  });
+});
