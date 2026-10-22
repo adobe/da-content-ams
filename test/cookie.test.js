@@ -78,6 +78,21 @@ describe('getCookie', () => {
       expect(result.status).to.equal(401);
     });
 
+    it('rejects look-alikes of the preview domains', async () => {
+      const env = {
+        ...TEST_ENV,
+        HLX_PROD_SERVER_HOST_LIVE: 'cust.aemlive.us',
+        HLX_PROD_SERVER_HOST_PAGE: 'cust.aempage.us',
+      };
+      const status = (host) => getCookie(createRequest('https://example.com/org/site/.gimme_cookie', {
+        headers: { Origin: `https://main--${DA_LIVE_REPO}--${GITHUB_ORG}.${host}` },
+      }), env).status;
+      expect(status('cust.aemlive.us')).to.equal(401);
+      expect(status('cust.aempage.us')).to.equal(401);
+      expect(status('cust-aemlive.us')).to.equal(403);
+      expect(status('cust-aempage.us')).to.equal(403);
+    });
+
     it('accepts exact trusted origin https://localhost:3000 and reflects it', async () => {
       const req = createRequest('https://example.com/org/site/.gimme_cookie', {
         headers: {
