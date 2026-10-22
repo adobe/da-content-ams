@@ -52,7 +52,7 @@ function getTrustedOriginPattern(env) {
   if (!(DA_LIVE_REPO && GITHUB_ORG && HLX_PROD_SERVER_HOST_LIVE && HLX_PROD_SERVER_HOST_PAGE)) {
     return undefined;
   }
-  return new RegExp(`^https://[a-zA-Z0-9-]+--${DA_LIVE_REPO}--${GITHUB_ORG}\\.(${HLX_PROD_SERVER_HOST_LIVE}|${HLX_PROD_SERVER_HOST_PAGE})$`);
+  return new RegExp(`^https://[a-zA-Z0-9-]+--${DA_LIVE_REPO}--${GITHUB_ORG}\\.(${HLX_PROD_SERVER_HOST_LIVE.replaceAll('.', '\\.')}|${HLX_PROD_SERVER_HOST_PAGE.replaceAll('.', '\\.')})$`);
 }
 
 /**
