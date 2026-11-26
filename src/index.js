@@ -64,6 +64,7 @@ export default {
     if (pathname === '/favicon.ico') return get404();
     if (pathname === '/robots.txt') return getRobots();
 
+    // Decode only for routing decisions; forward the original pathname to admin/storage.
     let decodedPathname;
     try {
       decodedPathname = decodeURIComponent(pathname);
@@ -81,14 +82,15 @@ export default {
     }
 
     if (!org || !site) return get404();
+    if (req.method === 'OPTIONS') return getFromAdmin(req, env);
 
     let migrated;
     try {
-      migrated = isHlx6Site(env, org, site);
+      migrated = await isHlx6Site(env, org, site);
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.error('[hlx6] Migration routing configuration error', e.message);
-      const msg = 'Migration routing configuration error';
+      console.error('[hlx6] Site backend resolution failed', e.message);
+      const msg = 'Site backend resolution failed';
       const resp = daResp({
         status: 503,
         body: req.method === 'HEAD' ? undefined : msg,
@@ -102,11 +104,8 @@ export default {
 
     if (migrated) return getFromAdmin(req, env);
 
-    const normalizedOrg = org.toLowerCase();
-    const normalizedPath = `/${parts.join('/')}${decodedPathname.endsWith('/') ? '/' : ''}`;
-
-    if (shouldGetFromStorage(env, req, normalizedPath.toLowerCase(), normalizedOrg)) {
-      return getFromStorage(normalizedPath, env);
+    if (shouldGetFromStorage(env, req, pathname, org)) {
+      return getFromStorage(pathname, env);
     }
 
     return getFromAdmin(req, env);
