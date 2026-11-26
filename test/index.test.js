@@ -44,6 +44,7 @@ function createEnv(overrides = {}) {
     S3_ACCESS_KEY_ID: 'test-key',
     S3_SECRET_ACCESS_KEY: 'test-secret',
     daadmin: { fetch: globalThis.fetch },
+    DA_SITE_BACKENDS: { get: async () => 'da' },
     ...overrides,
   };
 }
@@ -276,35 +277,41 @@ describe('Index Tests', () => {
   });
 
   describe('migrated sites', () => {
-    it('fails closed on malformed dashboard JSON before an allowlisted storage read without leaking var names', async () => {
+    it('fails closed on invalid registry entries before an allowlisted storage read', async () => {
       const result = await worker.fetch(createRequest('https://example.com/org1/site/page', {
         headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
-      }), createEnv({ HLX6_MIGRATED_SITES: '["org1/site"' }));
+      }), createEnv({ DA_SITE_BACKENDS: { get: async () => 'invalid' } }));
       expect(result.status).to.equal(503);
-      expect(result.headers.get('x-error')).to.equal('Migration routing configuration error');
+      expect(result.headers.get('x-error')).to.equal('Site backend resolution failed');
       expect(result.headers.get('access-control-expose-headers')).to.equal('x-error');
-      expect(await result.text()).to.equal('Migration routing configuration error');
+      expect(await result.text()).to.equal('Site backend resolution failed');
     });
 
-    it('omits body on HEAD when migration configuration is malformed', async () => {
+    it('omits body on HEAD when the registry read fails', async () => {
       const result = await worker.fetch(createRequest('https://example.com/org1/site/page', {
         method: 'HEAD',
         headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
-      }), createEnv({ HLX6_DUAL_WRITES: '["org1/site"' }));
+      }), createEnv({
+        DA_SITE_BACKENDS: {
+          get: async () => {
+            throw new Error('KV unavailable');
+          },
+        },
+      }));
       expect(result.status).to.equal(503);
-      expect(result.headers.get('x-error')).to.equal('Migration routing configuration error');
+      expect(result.headers.get('x-error')).to.equal('Site backend resolution failed');
       expect(await result.text()).to.equal('');
     });
 
     it('normalizes percent-encoded, dot, and empty path segments before migration checks and rejects traversal', async () => {
-      nock.admin().get('/source/optout-org/site/logo.png').reply(401);
+      nock.admin().get('/source/optout-org/%73ite/logo.png').reply(401);
       const encoded = await worker.fetch(createRequest('https://example.com//optout-org/./%73ite/logo.png'), createEnv({
-        ADMIN_IMAGES_OPTOUT_ORGS: 'optout-org', HLX6_MIGRATED_SITES: '["optout-org/site"]',
+        ADMIN_IMAGES_OPTOUT_ORGS: 'optout-org', DA_SITE_BACKENDS: { get: async () => 'hlx6' },
       }));
       expect(encoded.status).to.equal(401);
 
       const traversal = await worker.fetch(createRequest('https://example.com/optout-org/other/..%2Fsite/logo.png'), createEnv({
-        ADMIN_IMAGES_OPTOUT_ORGS: 'optout-org', HLX6_MIGRATED_SITES: '["optout-org/site"]',
+        ADMIN_IMAGES_OPTOUT_ORGS: 'optout-org', DA_SITE_BACKENDS: { get: async () => 'hlx6' },
       }));
       expect(traversal.status).to.equal(404);
 
@@ -312,16 +319,31 @@ describe('Index Tests', () => {
       expect(badEncoding.status).to.equal(404);
     });
 
+    it('forwards percent-encoded asset filenames to admin without decoding them', async () => {
+      nock.admin().get('/source/org/site/my%20image.png').reply(200, 'legacy');
+      nock.admin().get('/source/org/site/a%23b.png').reply(200, 'migrated');
+
+      const legacy = await worker.fetch(createRequest('https://example.com/org/site/My%20Image.png'), createEnv());
+      expect(legacy.status).to.equal(200);
+      expect(await legacy.text()).to.equal('legacy');
+
+      const migrated = await worker.fetch(createRequest('https://example.com/org/site/a%23b.png'), createEnv({
+        DA_SITE_BACKENDS: { get: async () => 'hlx6' },
+      }));
+      expect(migrated.status).to.equal(200);
+      expect(await migrated.text()).to.equal('migrated');
+    });
+
     it('preserves OPTIONS and .gimme_cookie locally on migrated sites', async () => {
       const optionsRes = await worker.fetch(
         createRequest('https://example.com/org1/site/page', { method: 'OPTIONS' }),
-        createEnv({ HLX6_MIGRATED_SITES: ['org1/site'] }),
+        createEnv({ DA_SITE_BACKENDS: { get: async () => { throw new Error('Must not read KV'); } } }),
       );
       expect(optionsRes.status).to.equal(200);
 
       const cookieRes = await worker.fetch(
-        createRequest('https://example.com/org1/site/.gimme_cookie', { headers: { Origin: 'https://da.live' } }),
-        createEnv({ HLX6_MIGRATED_SITES: ['org1/site'] }),
+        createRequest('https://example.com/org1/site/.gimme_cookie', { headers: { Origin: `https://${DA_DOMAIN}` } }),
+        createEnv({ DA_SITE_BACKENDS: { get: async () => { throw new Error('Must not read KV'); } } }),
       );
       expect(cookieRes.status).to.equal(401);
     });
@@ -341,7 +363,7 @@ describe('Index Tests', () => {
         .reply(200, 'HLX6 content', { 'content-type': 'text/html' });
       const result = await worker.fetch(createRequest('https://example.com/ORG1/SITE/library/blocks/columns', {
         headers: { 'cf-connecting-ip': HELIX_ADMIN_IP, authorization: 'Bearer caller' },
-      }), createEnv({ HLX6_MIGRATED_SITES: ['org1/site'] }));
+      }), createEnv({ DA_SITE_BACKENDS: { get: async () => 'hlx6' } }));
       expect(result.status).to.equal(200);
       expect(await result.text()).to.equal('HLX6 content');
     });
@@ -349,28 +371,19 @@ describe('Index Tests', () => {
     it('uses admin before image opt-out without falling back on denial', async () => {
       nock.admin().get('/source/optout-org/site/logo.png').reply(401);
       const result = await worker.fetch(createRequest('https://example.com/optout-org/site/logo.png'), createEnv({
-        ADMIN_IMAGES_OPTOUT_ORGS: 'optout-org', HLX6_MIGRATED_SITES: '["optout-org/site"]',
+        ADMIN_IMAGES_OPTOUT_ORGS: 'optout-org', DA_SITE_BACKENDS: { get: async () => 'hlx6' },
       }));
       expect(result.status).to.equal(401);
     });
 
-    it('keeps a mapped dual-write source on existing storage routing', async () => {
-      nock.s3(S3_BUCKET_HOST).get(/\/.+/).reply(200, 'DA content', { 'content-type': 'text/html' });
+    it('follows the HLX6 registry entry despite a legacy dual-write source flag', async () => {
+      nock.admin().get('/source/org1/site/page.html').reply(200, 'HLX6 content', { 'content-type': 'text/html' });
       const result = await worker.fetch(createRequest('https://example.com/org1/site/page', {
         headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
       }), createEnv({
-        HLX6_MIGRATED_SITES: 'org1/site', HLX6_DUAL_WRITES: 'org1/site -> target/other',
+        DA_SITE_BACKENDS: { get: async () => 'hlx6' }, HLX6_DUAL_WRITES: 'org1/site -> target/other',
       }));
-      expect(await result.text()).to.equal('DA content');
-    });
-
-    it('does not exempt a mapped dual-write target', async () => {
-      nock.admin().get('/source/org1/site/page.html').reply(200, 'HLX6 content');
-      const result = await worker.fetch(createRequest('https://example.com/org1/site/page', {
-        headers: { 'cf-connecting-ip': HELIX_ADMIN_IP },
-      }), createEnv({
-        HLX6_MIGRATED_SITES: 'org1/site', HLX6_DUAL_WRITES: ['source/site -> org1/site'],
-      }));
+      expect(result.status).to.equal(200);
       expect(await result.text()).to.equal('HLX6 content');
     });
   });
